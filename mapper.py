@@ -6,28 +6,29 @@ from __future__ import division
 import itertools
 import logging
 from pprint import pprint, pformat
-from PIL import Image, ImageDraw, ImageFont
+import math
+
+import cairo
+
+import cairofont
 
 from locations import locations
 
 logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(levelname)-7s %(message)s")
 
-output_size = (800, 800)
-plot_size = (700, 700)
+output_size = (1024, 1024)
+draw_area = 0.85 # as a fraction of output_size
 
-locplot_size = (4, 4)
+locplot_pad = 0.005
 
-route_colors = ((192, 64, 64),
-                (64, 192, 64),
-                (64, 64, 192),
-                (192, 192, 64),
-                (192, 64, 192),
-                (64, 192, 192),)
+route_colors = ((0.75, 0.25, 0.25),
+                (0.25, 0.75, 0.25),
+                (0.25, 0.25, 0.75),
+                (0.75, 0.75, 0.25),
+                (0.75, 0.25, 0.75),
+                (0.25, 0.75, 0.75))
 
-try:
-    font = ImageFont.truetype("/cygdrive/c/Windows/Fonts/tahomabd.ttf", 11)
-except:
-    font = ImageFont.load_default()
+face = cairofont.create_cairo_font_face_for_file("/cygdrive/c/Windows/Fonts/tahoma.ttf")
 
 ####
 
@@ -144,132 +145,118 @@ def bounds():
 
     return (top_left, bottom_right)
         
-logging.info("Bounds: {}".format(pformat(bounds())))
-
-def plot_region():
-    xpad = (output_size[0] - plot_size[0]) / 2
-    ypad = (output_size[1] - plot_size[1]) / 2
-    
-
-    return ((xpad, ypad),
-            (xpad + plot_size[0], ypad + plot_size[1]))
-
 def map2img(x, y, z):
     tl, br = bounds()
-    plot_tl, plot_br = plot_region()
     
     x_range = (br[0] - tl[0])
-    img_x = (x - tl[0]) / x_range * plot_size[0] + plot_tl[0]
+    img_x = (x - tl[0]) / x_range
 
     z_range = (br[2] - tl[2])
-    img_y = (z - tl[2]) / z_range * plot_size[1] + plot_tl[1]
+    img_y = (z - tl[2]) / z_range
 
-    return (int(round(img_x)),
-            int(round(img_y)))
+    return img_x, img_y
 
-def draw_connecting_lines(img):
-    draw = ImageDraw.Draw(img)
-
+def draw_connecting_lines(ctx):
     colors = itertools.cycle(route_colors)
+    ctx.set_line_width(0.01)
     
-    try:
-        drawn_paths = set()
+    drawn_paths = set()
 
-        for loc in locations:
-            dests = get_dests(loc['name'])
-            for dest in dests: 
-                path = tuple(sorted([loc['name'], dest[0]]))
-                if path in drawn_paths:
-                    continue
+    for loc in locations:
+        dests = get_dests(loc['name'])
+        for dest in dests: 
+            path = tuple(sorted([loc['name'], dest[0]]))
+            if path in drawn_paths:
+                continue
 
-                hops = longest_path(loc['name'], dest[0])
-                color = colors.next()
-                
-                for i in range(len(hops) - 1):
-                    fr = map2img(*hops[i])
-                    to = map2img(*hops[i + 1])
-                    draw.line((tuple(fr), tuple(to)), color)
+            hops = longest_path(loc['name'], dest[0])
 
-                drawn_paths.add(path)
-    finally:
-        del draw
-            
-def draw_translucent_poly(img, coord_list, fill_rgb, fill_alpha):
-    # adapted from http://stackoverflow.com/a/433638/339378
-    base_layer = img.copy()
-    color_layer = Image.new('RGBA', base_layer.size, fill_rgb)
-    alpha_mask = Image.new('L', base_layer.size, 0)
-    alpha_mask_draw = ImageDraw.Draw(alpha_mask)
-    alpha_mask_draw.polygon(coord_list, fill=fill_alpha)
-    base_layer = Image.composite(color_layer, base_layer, alpha_mask)
+            ctx.new_path()
 
-    img.paste(base_layer, None)
+            fr = map2img(*hops[0])
+            ctx.move_to(*fr)
 
-def draw_translucent_rect(img, bounds, fill_rgb, fill_alpha):
-    return draw_translucent_poly(img,
-                                 ((bounds[0], bounds[1]),
-                                  (bounds[2], bounds[1]),
-                                  (bounds[2], bounds[3]),
-                                  (bounds[0], bounds[3])),
-                                 fill_rgb,
-                                 fill_alpha)
+            for hop in hops[1:]:
+                to = map2img(*hop)
+                ctx.line_to(*to)
+
+            color = colors.next()
+            ctx.set_source_rgb(*color)
+            ctx.stroke()
+
+            drawn_paths.add(path)
     
-def plot_locations(img):
-    draw = ImageDraw.Draw(img)
+def plot_locations(ctx):
+    ctx.set_line_width(0.001)
+    
+    for loc in locations:
+        name = loc['name']
+        plot = map2img(*loc['location'])
 
-    try:
-        for loc in locations:
-            name = loc['name']
-            plot = map2img(*loc['location'])
+        logging.info('{} at {}'.format(name, plot))
 
-            logging.info('{} at {}'.format(name, plot))
+        # draw a circle for the location
 
-            # draw a square for the location
+        # clear the area around (cut off the route lines) for prettying
+        ctx.new_path()
+        ctx.set_source_rgb(1, 1, 1)
+        ctx.arc(plot[0], plot[1], 0.012, 0, 2 * math.pi)
+        ctx.fill()
 
-            rectbounds = []
-            for i in range(2):
-                rectbounds.append(int(round(plot[i] - locplot_size[i] / 2)))
-            for i in range(2):
-                rectbounds.append(int(round(plot[i] + locplot_size[i] / 2)))
+        # draw a filled circle for the location
+        ctx.new_path()
+        ctx.set_source_rgb(0, 0, 0)
+        ctx.arc(plot[0], plot[1], 0.005, 0, 2 * math.pi)
+        ctx.fill()
 
-            draw.rectangle(rectbounds, (0, 0, 0))
-
-            # label the location
-
-            textsize = draw.textsize(name, font=font)
-
-            text_x = int(round(plot[0] - textsize[0] / 2))
-
-            bottom_edge = plot[1] - (locplot_size[1] + 3) # technically just half the plot size, to move above the square; but then we add the same amount again as padding, so it's locplot_size / 2 * 2
-            text_y = int(round(bottom_edge - textsize[1]))
-
-            textrect = (text_x - 3, text_y - 3,
-                        text_x + textsize[0] + 2, text_y + textsize[1] + 2)
-            
-            draw_translucent_rect(img,
-                                  textrect,
-                                  (255, 255, 255),
-                                  128)
-            
-            draw.rectangle(textrect, outline=(0, 0, 0), fill=None)
-            
-            draw.text((text_x, text_y),
-                      name,
-                      font=font,
-                      fill=(0, 0, 0))
-
-
-    finally:
-        del draw
-
+        # and put a circle around it
+        ctx.new_path()
+        ctx.set_source_rgb(0, 0, 0)
+        ctx.arc(plot[0], plot[1], 0.0085, 0, 2 * math.pi)
+        ctx.stroke()
         
+        # label the location
+
+        ctx.set_font_face(face)
+        ctx.set_font_size(0.018)
+        x_off, y_off, text_w, text_h = ctx.text_extents(name)[:4]
+        text_x = plot[0] - x_off - text_w / 2
+
+        bottom_edge = plot[1] - (locplot_pad * 3.5) # technically just half the plot size, to move above the square; but then we add the same amount again as padding, so it's locplot_size / 2 * 2
+        text_y = bottom_edge - y_off - text_h
+
+        pad = locplot_pad
+        
+        textrect = (text_x + x_off - pad, text_y + y_off - pad,
+                    text_w + pad * 2, text_h + pad * 2)
+
+        ctx.new_path()
+        ctx.rectangle(*textrect)
+        ctx.set_source_rgba(1, 1, 1, 0.75)
+        ctx.fill()
+        
+        ctx.new_path()
+        ctx.rectangle(*textrect)
+        ctx.set_source_rgb(0, 0, 0)
+        ctx.stroke()
+
+        ctx.move_to(text_x, text_y)
+        ctx.set_source_rgb(0.5, 0, 0)
+        ctx.show_text(name)
 
         
 def build(fn):
-    img = Image.new('RGB', output_size, (255, 255, 255))
-    draw_connecting_lines(img)
-    plot_locations(img)
-    img.save(fn, 'PNG')
+    surface = cairo.ImageSurface(cairo.FORMAT_ARGB32, *output_size)
+    ctx = cairo.Context(surface)
+    ctx.scale(*output_size)
+    pad = (1 - draw_area) / 2
+    ctx.translate(pad, pad)
+    ctx.scale(draw_area, draw_area)
+    
+    draw_connecting_lines(ctx)
+    plot_locations(ctx)
+    
+    surface.write_to_png(fn)
 
 
 if __name__ == '__main__':
