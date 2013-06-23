@@ -1,8 +1,11 @@
 # -*- coding: utf-8 -*-
 
 #
-# Copy this to locations.py and put in your own custom locations.
+# Copy this to locations.py and put in your own custom locations and
+# appearance.
 #
+
+# Locations
 
 locations = [{'name': 'Northland',
               'location': (-277, 78, -811),
@@ -19,8 +22,7 @@ locations = [{'name': 'Northland',
                                 None,
                                 [[191, None, None], [None, None, 326]]),
                                ('Spawn',
-                                '43',
-                                [[-163, None, None]]),
+                                '43'),
                                ('Midnorth', '54'))},
              {'name': 'Lower NPCville',
               'location': (210, 66, 324),
@@ -55,3 +57,54 @@ locations = [{'name': 'Northland',
              {'name': 'Kanave',
               'location': (360, 59, -132),
               'destinations': ('Montcuq',)}]
+
+# The size of the output image in pixels (width, height).
+output_size = (1024, 1024)
+
+# The fraction of the output_size where locations will be plotted.
+# eg. 1.0 will plot locations on the very edges of the map, and 0.5
+# will only use half the output space (eg 512 pixels in the center of
+# a 1024-sized image).
+draw_area = 0.85
+
+# Scale everything.  Increasing this will make everything draw larger
+# and closer together, and correspondingly decrease the space
+# available for plotting.  Decreasing it will do the opposite.  1.0
+# places everything as it appears in the code.
+scale = 1.0
+
+# How much space to put between a location plot and the text.  This is
+# fuzzy at the moment, and also (erroneously) affects how much padding
+# you get between the text and the border surrounding the text.  For
+# both cases, larger number = more space.
+locplot_pad = 5
+
+# A list of colors to display routes in.  Each route will be drawn
+# using the next available color in this list, cycling back to the
+# first one when the list is exhausted.  These are RGB tuples from 0
+# to 1.0.
+route_colors = ((0.75, 0.25, 0.25),
+                (0.25, 0.75, 0.25),
+                (0.25, 0.25, 0.75),
+                (0.75, 0.75, 0.25),
+                (0.75, 0.25, 0.75),
+                (0.25, 0.75, 0.75))
+
+# Color for the location dots.
+location_color = (0, 0, 0)
+
+# Location label text color.
+label_text_color = (0.5, 0, 0)
+
+# Label background color (RGBA).
+label_bg_color = (1, 1, 1, 0.75)
+
+# Color for the location dots.
+label_border_color = (0, 0, 0)
+
+# Location label font size.
+font_size = 13
+
+# Background color
+bg_color = (1, 1, 1)
+
