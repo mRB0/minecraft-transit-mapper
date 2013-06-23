@@ -5,7 +5,7 @@
 # appearance.
 #
 
-# Locations
+# Locations.
 
 locations = [{'name': 'Northland',
               'location': (-277, 78, -811),
@@ -57,6 +57,10 @@ locations = [{'name': 'Northland',
              {'name': 'Kanave',
               'location': (360, 59, -132),
               'destinations': ('Montcuq',)}]
+
+# Output image filename.
+# Can be overridden by using -o upon invocation.
+output_filename = "locations-example.png"
 
 # The size of the output image in pixels (width, height).
 output_size = (1024, 1024)
