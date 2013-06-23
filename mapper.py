@@ -7,6 +7,7 @@ import itertools
 import logging
 from pprint import pprint, pformat
 import math
+import argparse
 
 import cairo
 
@@ -261,4 +262,32 @@ class Mapper(object):
 
 
 if __name__ == '__main__':
-    Mapper(__import__('locations')).build('out.png')
+    parser = argparse.ArgumentParser(description='Build a transit map.')
+
+    parser.add_argument('-o',
+                        metavar='OUTFILE',
+                        type=str,
+                        required=False,
+                        help="Output filename (overrides whatever's specified inside LOC_FILE)")
+
+    parser.add_argument('loc_file',
+                        metavar='LOC_FILE',
+                        type=str,
+                        default='locations',
+                        nargs='?',
+                        help='Location file to import; default is locations')
+    
+    args = parser.parse_args()
+
+    loc_file = args.loc_file
+    if loc_file.endswith('.py'):
+        loc_file = loc_file[:-3]
+
+    locs = __import__(loc_file)
+    
+    if args.o is None:
+        outfile = locs.output_filename
+    else:
+        outfile = args.o
+    
+    Mapper(locs).build(outfile)
